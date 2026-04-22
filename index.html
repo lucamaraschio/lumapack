@@ -815,10 +815,18 @@ document.addEventListener('keydown', e => {
 // ═══════════════════════════════════════════════════════════════════════════
 // START
 // ═══════════════════════════════════════════════════════════════════════════
+// Forza pulizia cache service worker, poi avvia
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').catch(e => console.warn('SW:', e));
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    const kills = regs.map(r => r.unregister());
+    return Promise.all(kills);
+  }).then(() => {
+    caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+    init();
+  });
+} else {
+  init();
 }
-init();
 </script>
 </body>
 </html>
