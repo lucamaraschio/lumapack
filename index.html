@@ -258,7 +258,7 @@ function showError(msg) {
 async function init() {
   // Rileva config placeholder
   if (FIREBASE_CONFIG.apiKey === 'YOUR_API_KEY') {
-    showError('⚙️ Firebase non configurato.<br><small style="color:#6B7280">Sostituisci i valori in FIREBASE_CONFIG nell'HTML.</small>');
+    showError(`⚙️ Firebase non configurato.<br><small style="color:#6B7280">Inserisci i valori Firebase in FIREBASE_CONFIG.</small>`);
     return;
   }
 
