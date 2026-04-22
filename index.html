@@ -148,31 +148,22 @@ button{cursor:pointer}
 </head>
 <body>
 <div id="app">
-  <div class="loading"><div class="spinner"></div><p>Caricamento...</p></div>
+  <div class="loading"><div class="spinner"></div><p id="status-msg">1. Avvio...</p></div>
 </div>
 
 <script>
 // ═══════════════════════════════════════════════════════════════════════════
 // FIREBASE CONFIG — sostituisci con i valori del tuo progetto
 // ═══════════════════════════════════════════════════════════════════════════
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyAaz6-ss9OUYpUmQghCzKJubXGlY7TYMRM",
-  authDomain: "lumapack-d9d57.firebaseapp.com",
-  databaseURL: "https://lumapack-d9d57-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "lumapack-d9d57",
-  storageBucket: "lumapack-d9d57.firebasestorage.app",
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyAaz6-ss9OUYpUmQghCzKJubXGlY7TYMRM",
+  authDomain:        "lumapack-d9d57.firebaseapp.com",
+  databaseURL:       "https://lumapack-d9d57-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "lumapack-d9d57",
+  storageBucket:     "lumapack-d9d57.firebasestorage.app",
   messagingSenderId: "737924294798",
-  appId: "1:737924294798:web:aa87150046848e36f141df"
+  appId:             "1:737924294798:web:aa87150046848e36f141df"
 };
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DEFAULT PRESET DATA
@@ -264,44 +255,67 @@ function showError(msg) {
     `<div class="loading"><p style="color:#DC2626;text-align:center;padding:0 24px;line-height:1.6">${msg}</p></div>`;
 }
 
+function setStatus(msg) {
+  const el = document.getElementById('status-msg');
+  if (el) el.innerHTML = msg;
+}
+
 async function init() {
-  // Rileva config placeholder
+  setStatus('1. Avvio...');
+
   if (FIREBASE_CONFIG.apiKey === 'YOUR_API_KEY') {
-    showError(`⚙️ Firebase non configurato.<br><small style="color:#6B7280">Inserisci i valori Firebase in FIREBASE_CONFIG.</small>`);
+    showError('⚙️ Config Firebase mancante.');
     return;
   }
 
+  setStatus('2. Inizializzazione Firebase...');
   try {
     firebase.initializeApp(FIREBASE_CONFIG);
   } catch(e) {
     if (!e.code?.includes('duplicate-app')) {
-      showError('Errore inizializzazione Firebase.<br><small>' + e.message + '</small>');
-      return;
+      showError('Errore initializeApp:<br><small>' + e.message + '</small>'); return;
     }
   }
 
+  const T = (p, ms, label) => Promise.race([p,
+    new Promise((_, r) => setTimeout(() => r(new Error('TIMEOUT: ' + label)), ms))]);
+
+  setStatus('3. Auth anonima in corso...');
+  let user;
   try {
-    const withTimeout = (p, ms) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error('timeout')), ms))]);
-    const { user } = await withTimeout(firebase.auth().signInAnonymously(), 10000);
-    S.uid = user.uid;
-    const snap = await withTimeout(dbr().once('value'), 10000);
-    const val  = snap.val() || {};
-    if (val.presets) {
-      S.presets = parsePresets(val.presets);
-    } else {
-      await seedPresets();
-    }
-    S.trips = val.trips ? parseTrips(val.trips) : {};
-    S.view = 'home';
-    S.selPresetId = Object.keys(S.presets)[0] || '';
-    render();
+    const res = await T(firebase.auth().signInAnonymously(), 8000, 'signInAnonymously');
+    user = res.user;
+    setStatus('4. Auth OK (uid: ' + user.uid.slice(0,8) + '...) — carico dati...');
   } catch(e) {
-    const msg = e.message === 'timeout'
-      ? 'Timeout connessione.<br><small>Controlla la rete o il databaseURL Firebase.</small>'
-      : 'Errore Firebase:<br><small>' + e.message + '</small>';
-    showError(msg);
-    console.error(e);
+    showError('Errore Auth:<br><small>' + e.message + '</small>'); return;
   }
+
+  S.uid = user.uid;
+
+  if (!FIREBASE_CONFIG.databaseURL || FIREBASE_CONFIG.databaseURL.includes('YOUR_PROJECT')) {
+    showError('databaseURL mancante o errato nella config Firebase.<br><small>Aggiungilo manualmente dalla console Firebase → Realtime Database.</small>');
+    return;
+  }
+
+  setStatus('5. Lettura database...');
+  let val;
+  try {
+    const snap = await T(dbr().once('value'), 8000, 'database read');
+    val = snap.val() || {};
+    setStatus('6. Database OK — rendering...');
+  } catch(e) {
+    showError('Errore Database:<br><small>' + e.message + '</small>'); return;
+  }
+
+  if (val.presets) {
+    S.presets = parsePresets(val.presets);
+  } else {
+    await seedPresets();
+  }
+  S.trips = val.trips ? parseTrips(val.trips) : {};
+  S.view = 'home';
+  S.selPresetId = Object.keys(S.presets)[0] || '';
+  render();
 }
 
 async function seedPresets() {
