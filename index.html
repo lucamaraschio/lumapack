@@ -152,24 +152,18 @@ button{cursor:pointer}
 </div>
 
 <script>
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyAaz6-ss9OUYpUmQghCzKJubXGlY7TYMRM",
-  authDomain: "lumapack-d9d57.firebaseapp.com",
-  databaseURL: "https://lumapack-d9d57-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "lumapack-d9d57",
-  storageBucket: "lumapack-d9d57.firebasestorage.app",
-  messagingSenderId: "737924294798",
-  appId: "1:737924294798:web:aa87150046848e36f141df"
+// ═══════════════════════════════════════════════════════════════════════════
+// FIREBASE CONFIG — sostituisci con i valori del tuo progetto
+// ═══════════════════════════════════════════════════════════════════════════
+const FIREBASE_CONFIG = {
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
+  databaseURL:       "https://YOUR_PROJECT_ID-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId:             "YOUR_APP_ID"
 };
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DEFAULT PRESET DATA
@@ -256,12 +250,32 @@ function tripProgress(trip) {
 // ═══════════════════════════════════════════════════════════════════════════
 // FIREBASE INIT
 // ═══════════════════════════════════════════════════════════════════════════
+function showError(msg) {
+  document.getElementById('app').innerHTML =
+    `<div class="loading"><p style="color:#DC2626;text-align:center;padding:0 24px;line-height:1.6">${msg}</p></div>`;
+}
+
 async function init() {
-  firebase.initializeApp(FIREBASE_CONFIG);
+  // Rileva config placeholder
+  if (FIREBASE_CONFIG.apiKey === 'YOUR_API_KEY') {
+    showError('⚙️ Firebase non configurato.<br><small style="color:#6B7280">Sostituisci i valori in FIREBASE_CONFIG nell'HTML.</small>');
+    return;
+  }
+
   try {
-    const { user } = await firebase.auth().signInAnonymously();
+    firebase.initializeApp(FIREBASE_CONFIG);
+  } catch(e) {
+    if (!e.code?.includes('duplicate-app')) {
+      showError('Errore inizializzazione Firebase.<br><small>' + e.message + '</small>');
+      return;
+    }
+  }
+
+  try {
+    const withTimeout = (p, ms) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error('timeout')), ms))]);
+    const { user } = await withTimeout(firebase.auth().signInAnonymously(), 10000);
     S.uid = user.uid;
-    const snap = await dbr().once('value');
+    const snap = await withTimeout(dbr().once('value'), 10000);
     const val  = snap.val() || {};
     if (val.presets) {
       S.presets = parsePresets(val.presets);
@@ -273,10 +287,10 @@ async function init() {
     S.selPresetId = Object.keys(S.presets)[0] || '';
     render();
   } catch(e) {
-    document.getElementById('app').innerHTML =
-      `<div class="loading"><p style="color:#DC2626;text-align:center">
-        Errore di connessione Firebase.<br>Controlla la configurazione.
-      </p></div>`;
+    const msg = e.message === 'timeout'
+      ? 'Timeout connessione.<br><small>Controlla la rete o il databaseURL Firebase.</small>'
+      : 'Errore Firebase:<br><small>' + e.message + '</small>';
+    showError(msg);
     console.error(e);
   }
 }
@@ -778,6 +792,9 @@ document.addEventListener('keydown', e => {
 // ═══════════════════════════════════════════════════════════════════════════
 // START
 // ═══════════════════════════════════════════════════════════════════════════
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(e => console.warn('SW:', e));
+}
 init();
 </script>
 </body>
