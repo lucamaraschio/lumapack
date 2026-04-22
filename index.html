@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta name="theme-color" content="#1D4ED8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="LumaPack">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
+<title>LumaPack 🧳</title>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#F7F6F2}
+body{font-family:-apple-system,'SF Pro Text',Helvetica Neue,sans-serif}
+input,button{font-family:inherit}
+button{cursor:pointer}
+
+#app{
+  height:100vh;display:flex;flex-direction:column;
+  max-width:430px;margin:0 auto;
+  position:relative;overflow:hidden;background:#F7F6F2
+}
+.scroll-area{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.scroll-area::-webkit-scrollbar{display:none}
+
+/* ── LOADING ── */
+.loading{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#6B7280;font-size:15px}
+.spinner{width:32px;height:32px;border:3px solid #E8E5DF;border-top-color:#1D4ED8;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── BOTTOM NAV ── */
+.bottom-nav{flex-shrink:0;background:#fff;border-top:1px solid #E8E5DF;display:flex;align-items:center;justify-content:space-around;padding:10px 24px 28px}
+.nav-btn{flex:1;background:none;border:none;display:flex;flex-direction:column;align-items:center;gap:3px;color:#B0AAA5;padding:6px 0}
+.nav-btn.active{color:#1D4ED8}
+.nav-icon{font-size:22px;line-height:1}
+.nav-label{font-size:10px;font-weight:700;letter-spacing:.06em}
+.nav-plus{background:#1D4ED8;border:none;border-radius:20px;width:56px;height:56px;color:#fff;font-size:28px;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 6px 20px rgba(29,78,216,.38)}
+
+/* ── HOME ── */
+.home-header{padding:52px 20px 24px}
+.home-eyebrow{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#B0AAA5}
+.home-title{font-size:26px;font-weight:800;color:#1A1614;letter-spacing:-.03em;margin-top:8px}
+.home-list{padding:0 20px 20px;display:flex;flex-direction:column;gap:10px}
+.empty-state{text-align:center;padding:52px 20px 32px}
+.empty-icon{font-size:64px;line-height:1;margin-bottom:14px}
+.empty-text{color:#6B7280;font-size:15px;line-height:1.7}
+.trip-card{background:#fff;border-radius:18px;padding:16px 18px;border:1.5px solid #E8E5DF;display:flex;align-items:center;gap:14px;cursor:pointer;transition:border-color .4s}
+.trip-card.complete{border-color:#A7F3D0}
+.trip-emoji{font-size:30px;line-height:1;flex-shrink:0}
+.trip-info{flex:1;min-width:0}
+.trip-name{font-weight:700;font-size:15px;color:#1A1614;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
+.trip-preset{font-size:12px;color:#B0AAA5;margin-bottom:10px}
+.trip-bar-track{height:5px;border-radius:5px;background:#E8E5DF;overflow:hidden}
+.trip-bar-fill{height:100%;border-radius:5px;background:#1D4ED8;transition:width .45s ease,background .3s}
+.trip-bar-fill.done{background:#059669}
+.trip-stats{font-size:11px;color:#B0AAA5;margin-top:5px;font-weight:500}
+.trip-del{background:none;border:none;color:#B0AAA5;padding:4px;flex-shrink:0;font-size:16px}
+
+/* ── TRIP HEADER ── */
+.trip-hdr{background:#fff;border-bottom:1px solid #E8E5DF;padding:48px 20px 18px;position:sticky;top:0;z-index:10}
+.back-btn{background:none;border:none;color:#1D4ED8;font-size:15px;padding:0;margin-bottom:14px;display:flex;align-items:center;gap:5px}
+.trip-hdr-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.trip-hdr-emoji{font-size:26px;line-height:1;margin-bottom:4px}
+.trip-hdr-name{font-size:20px;font-weight:800;color:#1A1614;letter-spacing:-.02em}
+.trip-hdr-preset{font-size:12px;color:#B0AAA5;margin-top:3px}
+
+/* ── CATEGORIES ── */
+.cats-wrap{padding:18px 20px 80px}
+.cat-section{margin-bottom:14px}
+.cat-hdr{width:100%;display:flex;align-items:center;justify-content:space-between;padding:5px 2px;background:none;border:none;font-family:inherit}
+.cat-lbl{display:flex;align-items:center;gap:7px}
+.cat-chev{font-size:11px;color:#B0AAA5;transition:transform .2s;display:inline-block}
+.cat-chev.open{transform:rotate(90deg)}
+.cat-name-txt{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#6B7280}
+.cat-count{font-size:12px;font-weight:600;color:#B0AAA5}
+.cat-count.done{color:#059669}
+.items-card{background:#fff;border-radius:14px;border:1px solid #E8E5DF;overflow:hidden;margin-top:6px}
+
+/* ── ITEM ROW ── */
+.item-row{display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #E8E5DF;cursor:pointer}
+.item-row.checked{opacity:.42}
+.chkbox{width:22px;height:22px;border-radius:7px;flex-shrink:0;border:2px solid #D1CEC8;background:transparent;display:flex;align-items:center;justify-content:center;transition:all .2s ease;pointer-events:none}
+.item-row.checked .chkbox{background:#1D4ED8;border-color:#1D4ED8}
+.item-name{flex:1;font-size:15px;color:#1A1614;pointer-events:none}
+.item-row.checked .item-name{text-decoration:line-through;text-decoration-color:#6B7280;color:#6B7280}
+.item-del{background:none;border:none;color:#B0AAA5;padding:2px 4px;font-size:17px;line-height:1}
+
+/* ── ADD ROW ── */
+.add-row{display:flex;align-items:center;gap:10px;padding:10px 16px}
+.add-ph{width:22px;height:22px;border-radius:7px;border:2px dashed #E8E5DF;flex-shrink:0}
+.add-inp{flex:1;border:none;outline:none;font-size:14px;color:#6B7280;background:transparent;font-family:inherit}
+.add-inp::placeholder{color:#B0AAA5}
+.add-go{background:#1D4ED8;color:#fff;border:none;border-radius:6px;width:26px;height:26px;align-items:center;justify-content:center;font-size:18px;display:none}
+.add-go.vis{display:flex}
+
+/* ── MODAL ── */
+.modal-bg{position:absolute;inset:0;background:rgba(10,8,5,.52);display:flex;align-items:flex-end;z-index:100}
+.modal-sheet{width:100%;background:#fff;border-radius:22px 22px 0 0;padding:20px 22px 40px}
+.modal-handle{width:36px;height:4px;border-radius:2px;background:#E8E5DF;margin:0 auto 20px}
+.modal-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}
+.modal-title{font-size:20px;font-weight:800;color:#1A1614}
+.modal-close{background:#F7F6F2;border:none;width:32px;height:32px;border-radius:8px;font-size:20px;color:#6B7280;display:flex;align-items:center;justify-content:center}
+.field-lbl{display:block;font-size:11px;font-weight:700;color:#B0AAA5;letter-spacing:.09em;text-transform:uppercase;margin-bottom:8px}
+.field-inp{width:100%;padding:13px 14px;border-radius:12px;font-size:15px;color:#1A1614;background:#F7F6F2;outline:none;border:1.5px solid #E8E5DF;margin-bottom:22px;font-family:inherit;transition:border-color .2s}
+.field-inp:focus{border-color:#1D4ED8}
+.preset-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:24px}
+.preset-card{padding:14px 12px;border-radius:13px;text-align:left;border:2px solid #E8E5DF;background:#fff;transition:all .15s;font-family:inherit}
+.preset-card.sel{border-color:#1D4ED8;background:#EFF6FF}
+.p-card-em{font-size:22px;line-height:1;margin-bottom:6px}
+.p-card-nm{font-size:12px;font-weight:700;color:#1A1614;line-height:1.4}
+.confirm-btn{width:100%;padding:15px;border-radius:14px;background:#D1CEC8;color:#fff;border:none;font-size:16px;font-weight:700;font-family:inherit;transition:background .2s;cursor:default}
+.confirm-btn.rdy{background:#1D4ED8;cursor:pointer}
+
+/* ── PRESETS VIEW ── */
+.vw-hdr{padding:48px 20px 24px}
+.view-back{background:none;border:none;color:#1D4ED8;font-size:15px;padding:0;margin-bottom:20px;display:flex;align-items:center;gap:5px;font-family:inherit}
+.view-title{font-size:24px;font-weight:800;color:#1A1614;letter-spacing:-.02em}
+.presets-list{padding:0 20px 80px;display:flex;flex-direction:column;gap:10px}
+.p-list-card{background:#fff;border-radius:16px;padding:16px 18px;border:1px solid #E8E5DF;display:flex;align-items:center;gap:14px}
+.p-list-em{font-size:26px;line-height:1}
+.p-list-info{flex:1}
+.p-list-name{font-weight:700;font-size:15px;color:#1A1614}
+.p-list-meta{font-size:12px;color:#B0AAA5;margin-top:2px}
+.edit-btn{background:#EFF6FF;color:#1D4ED8;border:none;border-radius:9px;padding:8px 14px;font-size:13px;font-weight:700;font-family:inherit}
+
+/* ── EDIT PRESET ── */
+.ep-body{padding:0 20px 80px}
+.ep-cat-card{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;border:1px solid #E8E5DF}
+.ep-cat-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.ep-cat-lbl{font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.09em}
+.ep-del-cat{background:none;border:none;color:#DC2626;font-size:12px;font-weight:600;font-family:inherit}
+.ep-item-row{display:flex;gap:8px;margin-bottom:8px}
+.ep-item-inp{flex:1;padding:9px 12px;border-radius:9px;border:1px solid #E8E5DF;font-size:14px;color:#1A1614;background:#F7F6F2;outline:none;font-family:inherit}
+.ep-del-item{background:none;border:none;color:#B0AAA5;font-size:18px;line-height:1}
+.ep-add-item{background:none;border:none;color:#1D4ED8;font-size:13px;font-weight:600;font-family:inherit;padding:4px 0}
+.new-cat-row{display:flex;gap:8px;margin-bottom:24px}
+.new-cat-inp{flex:1;padding:11px 14px;border-radius:10px;border:1.5px dashed #D1CEC8;font-size:14px;color:#1A1614;background:#fff;outline:none;font-family:inherit}
+.new-cat-btn{background:#1D4ED8;color:#fff;border:none;border-radius:10px;padding:11px 16px;font-size:20px}
+.save-btn{width:100%;padding:15px;border-radius:14px;background:#059669;color:#fff;border:none;font-size:16px;font-weight:700;font-family:inherit}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="loading"><div class="spinner"></div><p>Caricamento...</p></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// FIREBASE CONFIG — sostituisci con i valori del tuo progetto
+// ═══════════════════════════════════════════════════════════════════════════
+const FIREBASE_CONFIG = {
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
+  databaseURL:       "https://YOUR_PROJECT_ID-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId:             "YOUR_APP_ID"
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DEFAULT PRESET DATA
+// ═══════════════════════════════════════════════════════════════════════════
+const DEFAULT_PRESETS = [
+  { id:'mare', name:'Mare (3 gg)', emoji:'🏖️', categories:[
+    { name:'Abbigliamento', items:['T-shirt','Costumi','Infradito'] },
+    { name:'Cura & Sole',   items:['Crema solare 50+','Doposole'] },
+    { name:'Tech',          items:['Powerbank'] },
+    { name:'Spiaggia',      items:['Telo mare'] }
+  ]},
+  { id:'montagna', name:'Montagna / Trek', emoji:'⛰️', categories:[
+    { name:'Abbigliamento', items:['Maglie termiche','Pile / Guscio','Scarponcini'] },
+    { name:'Attrezzatura',  items:['Zaino 30L','Borraccia','Kit vesciche'] }
+  ]},
+  { id:'lavoro', name:'Lavoro (1–2 notti)', emoji:'💼', categories:[
+    { name:'Abbigliamento', items:['Camicie no-stiro','Scarpe formali'] },
+    { name:'Tech',          items:['Laptop e cavi'] },
+    { name:'Igiene',        items:['Beauty case (liquidi <100ml)'] },
+    { name:'Documenti',     items:['Badge aziendale'] }
+  ]},
+  { id:'lowcost', name:'Volo Low-Cost', emoji:'✈️', categories:[
+    { name:'Documenti',    items:['Passaporto',"Carta d'imbarco"] },
+    { name:'Carry-on',     items:['Bustina liquidi 20×20'] },
+    { name:'Comfort',      items:['Kindle / Libro','Tappi per orecchie'] },
+    { name:'Attenzione ⚠', items:['No oggetti taglienti'] }
+  ]}
+];
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════════════
+const S = {
+  uid: null,
+  trips: {},       // { id: { id, name, presetId, presetName, emoji, createdAt, items:{} } }
+  presets: {},     // { id: { id, name, emoji, categories:[{name, items:[]}] } }
+  view: 'loading', // loading | home | trip | presets | editPreset
+  tripId: null,
+  editPresetId: null,
+  showModal: false,
+  selPresetId: '',
+  collapsed: {},   // { catName: bool }
+  editState: null  // { cats: [{name,items:[]}] }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════════════════════════════
+const uid  = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+const esc  = s  => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const dbr  = p  => firebase.database().ref(`users/${S.uid}${p?'/'+p:''}`);
+const toArr = v => !v ? [] : (Array.isArray(v) ? v : Object.values(v));
+
+function parsePresets(val) {
+  const out = {};
+  Object.entries(val).forEach(([id,p]) => {
+    out[id] = { id, name:p.name, emoji:p.emoji,
+      categories: toArr(p.categories).map(c => ({
+        name: c.name, items: toArr(c.items||[])
+      }))
+    };
+  });
+  return out;
+}
+
+function parseTrips(val) {
+  const out = {};
+  Object.entries(val||{}).forEach(([id,t]) => {
+    out[id] = { id, name:t.name, presetId:t.presetId,
+      presetName:t.presetName, emoji:t.emoji,
+      createdAt:t.createdAt||0, items:t.items||{}
+    };
+  });
+  return out;
+}
+
+function tripProgress(trip) {
+  const items = Object.values(trip.items||{});
+  const done = items.filter(i=>i.checked).length;
+  const total = items.length;
+  return { done, total, pct: total ? Math.round(done/total*100) : 0 };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FIREBASE INIT
+// ═══════════════════════════════════════════════════════════════════════════
+async function init() {
+  firebase.initializeApp(FIREBASE_CONFIG);
+  try {
+    const { user } = await firebase.auth().signInAnonymously();
+    S.uid = user.uid;
+    const snap = await dbr().once('value');
+    const val  = snap.val() || {};
+    if (val.presets) {
+      S.presets = parsePresets(val.presets);
+    } else {
+      await seedPresets();
+    }
+    S.trips = val.trips ? parseTrips(val.trips) : {};
+    S.view = 'home';
+    S.selPresetId = Object.keys(S.presets)[0] || '';
+    render();
+  } catch(e) {
+    document.getElementById('app').innerHTML =
+      `<div class="loading"><p style="color:#DC2626;text-align:center">
+        Errore di connessione Firebase.<br>Controlla la configurazione.
+      </p></div>`;
+    console.error(e);
+  }
+}
+
+async function seedPresets() {
+  const obj = {};
+  DEFAULT_PRESETS.forEach(p => { obj[p.id] = { name:p.name, emoji:p.emoji, categories:p.categories }; });
+  await dbr('presets').set(obj);
+  S.presets = {};
+  DEFAULT_PRESETS.forEach(p => { S.presets[p.id] = JSON.parse(JSON.stringify(p)); });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ACTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+function createTrip(name, presetId) {
+  const preset = S.presets[presetId];
+  if (!preset) return;
+  const id = uid();
+  const items = {};
+  preset.categories.forEach(cat => {
+    cat.items.forEach(itemName => {
+      const iid = uid();
+      items[iid] = { id:iid, name:itemName, category:cat.name, checked:false, checkedAt:null, custom:false };
+    });
+  });
+  const trip = { id, name, presetId, presetName:preset.name, emoji:preset.emoji, createdAt:Date.now(), items };
+  S.trips[id] = trip;
+  dbr(`trips/${id}`).set(trip);
+  S.tripId = id; S.view = 'trip'; S.showModal = false;
+  render();
+}
+
+function toggleItem(tripId, itemId) {
+  const trip = S.trips[tripId];
+  const item = trip?.items[itemId];
+  if (!item) return;
+  const newVal = !item.checked;
+
+  // 1. Animate existing DOM element
+  const row = document.querySelector(`[data-iid="${itemId}"]`);
+  if (row) {
+    row.style.transition = 'opacity .35s ease';
+    row.classList.toggle('checked', newVal);
+    const cb = row.querySelector('.chkbox');
+    if (cb) { cb.style.background = newVal?'#1D4ED8':'transparent'; cb.style.borderColor = newVal?'#1D4ED8':'#D1CEC8'; cb.innerHTML = newVal?checkSVG():''; }
+    const nm = row.querySelector('.item-name');
+    if (nm) nm.style.textDecoration = newVal?'line-through':'none';
+  }
+
+  // 2. Update local state
+  item.checked = newVal; item.checkedAt = newVal ? Date.now() : null;
+
+  // 3. Firebase write
+  dbr(`trips/${tripId}/items/${itemId}`).update({ checked:newVal, checkedAt:item.checkedAt });
+
+  // 4. Update ring immediately (attribute-based → animated via CSS transition)
+  updateRing(tripId);
+
+  // 5. Re-sort list after animation
+  setTimeout(() => refreshCats(tripId), 460);
+}
+
+function addItem(tripId, category, name) {
+  const id = uid();
+  const item = { id, name, category, checked:false, checkedAt:null, custom:true };
+  S.trips[tripId].items[id] = item;
+  dbr(`trips/${tripId}/items/${id}`).set(item);
+  refreshCats(tripId);
+}
+
+function deleteItem(tripId, itemId) {
+  delete S.trips[tripId].items[itemId];
+  dbr(`trips/${tripId}/items/${itemId}`).remove();
+  refreshCats(tripId);
+  updateRing(tripId);
+}
+
+function deleteTrip(tripId) {
+  if (!confirm('Eliminare questo viaggio?')) return;
+  delete S.trips[tripId];
+  dbr(`trips/${tripId}`).remove();
+  S.tripId = null; S.view = 'home'; render();
+}
+
+// -- Preset editing --
+function enterEditPreset(presetId) {
+  S.editPresetId = presetId; S.view = 'editPreset';
+  S.editState = { cats: JSON.parse(JSON.stringify(S.presets[presetId].categories)) };
+  render();
+}
+
+function collectEditInputs() {
+  document.querySelectorAll('.ep-cat-card').forEach((card, ci) => {
+    if (!S.editState.cats[ci]) return;
+    S.editState.cats[ci].items = [...card.querySelectorAll('.ep-item-inp')].map(i=>i.value.trim()).filter(Boolean);
+  });
+}
+
+function addEditItem(ci) {
+  collectEditInputs();
+  S.editState.cats[ci].items.push('');
+  renderEditBody();
+  const inputs = document.querySelectorAll(`[data-ci="${ci}"] .ep-item-inp`);
+  const last = inputs[inputs.length-1];
+  if (last) { last.focus(); last.select(); }
+}
+
+function removeEditItem(ci, ii) {
+  collectEditInputs();
+  S.editState.cats[ci].items.splice(ii, 1);
+  renderEditBody();
+}
+
+function addEditCat() {
+  const inp = document.getElementById('new-cat-inp');
+  const name = inp?.value.trim();
+  if (!name) return;
+  collectEditInputs();
+  S.editState.cats.push({ name, items:[] });
+  renderEditBody();
+}
+
+function removeEditCat(ci) {
+  collectEditInputs();
+  S.editState.cats.splice(ci, 1);
+  renderEditBody();
+}
+
+function savePreset() {
+  collectEditInputs();
+  const cats = S.editState.cats.filter(c => c.name.trim());
+  S.presets[S.editPresetId].categories = cats;
+  dbr(`presets/${S.editPresetId}/categories`).set(cats);
+  S.view = 'presets'; S.editState = null; render();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RENDER HELPERS
+// ═══════════════════════════════════════════════════════════════════════════
+const checkSVG = () =>
+  `<svg width="12" height="10" viewBox="0 0 12 10"><path d="M1 5l3 3 7-7" stroke="white" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+function ringHTML(pct) {
+  const r=31, cx=39, cy=39, circ=2*Math.PI*r, arc=(pct/100)*circ;
+  const col = pct===100?'#059669':'#1D4ED8';
+  return `<svg id="progress-ring" width="78" height="78" viewBox="0 0 78 78">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#E8E5DF" stroke-width="5.5"/>
+    <circle class="ring-arc" cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${col}" stroke-width="5.5"
+      stroke-dasharray="${arc.toFixed(1)} ${circ.toFixed(1)}" stroke-linecap="round"
+      transform="rotate(-90 ${cx} ${cy})" style="transition:stroke-dasharray .5s ease,stroke .3s"/>
+    <text class="ring-txt" x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle"
+      font-size="${pct===100?18:15}" font-weight="700" fill="${col}" font-family="-apple-system,sans-serif">
+      ${pct===100?'✓':pct+'%'}
+    </text>
+  </svg>`;
+}
+
+function updateRing(tripId) {
+  const arc = document.querySelector('#progress-ring .ring-arc');
+  const txt = document.querySelector('#progress-ring .ring-txt');
+  if (!arc) return;
+  const {done,total,pct} = tripProgress(S.trips[tripId]);
+  const circ = 2*Math.PI*31;
+  const arcLen = (pct/100)*circ;
+  const col = pct===100?'#059669':'#1D4ED8';
+  arc.setAttribute('stroke-dasharray',`${arcLen.toFixed(1)} ${circ.toFixed(1)}`);
+  arc.setAttribute('stroke', col);
+  if (txt) { txt.textContent = pct===100?'✓':pct+'%'; txt.setAttribute('fill',col); txt.setAttribute('font-size',pct===100?'18':'15'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CATEGORIES RENDER + PARTIAL REFRESH
+// ═══════════════════════════════════════════════════════════════════════════
+function catsHTML(tripId) {
+  const trip = S.trips[tripId];
+  if (!trip) return '';
+  const allItems = Object.values(trip.items||{});
+  const cats = [...new Set(allItems.map(i=>i.category))];
+
+  return cats.map(catName => {
+    const items = allItems.filter(i=>i.category===catName);
+    const sorted = [...items].sort((a,b)=>{
+      if (a.checked!==b.checked) return a.checked?1:-1;
+      return (a.checkedAt||0)-(b.checkedAt||0);
+    });
+    const done = items.filter(i=>i.checked).length;
+    const isOpen = !S.collapsed[catName];
+    const isAllDone = done===items.length && items.length>0;
+
+    return `<div class="cat-section">
+      <button class="cat-hdr" data-a="toggle-cat" data-cat="${esc(catName)}">
+        <span class="cat-lbl">
+          <span class="cat-chev${isOpen?' open':''}">▶</span>
+          <span class="cat-name-txt">${esc(catName)}</span>
+        </span>
+        <span class="cat-count${isAllDone?' done':''}">${done}/${items.length}</span>
+      </button>
+      ${isOpen?`<div class="items-card">
+        ${sorted.map(item=>`
+          <div class="item-row${item.checked?' checked':''}" data-a="toggle-item" data-iid="${esc(item.id)}" data-tid="${esc(tripId)}">
+            <div class="chkbox" style="${item.checked?'background:#1D4ED8;border-color:#1D4ED8':''}">
+              ${item.checked?checkSVG():''}
+            </div>
+            <span class="item-name" style="${item.checked?'text-decoration:line-through':''}">${esc(item.name)}</span>
+            ${item.custom?`<button class="item-del" data-a="del-item" data-iid="${esc(item.id)}" data-tid="${esc(tripId)}">×</button>`:''}
+          </div>`).join('')}
+        <div class="add-row">
+          <div class="add-ph"></div>
+          <input class="add-inp" type="text" placeholder="+ Aggiungi..." data-cat="${esc(catName)}" data-tid="${esc(tripId)}">
+          <button class="add-go" data-a="add-item" data-cat="${esc(catName)}" data-tid="${esc(tripId)}">+</button>
+        </div>
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function refreshCats(tripId) {
+  // Save input values before re-render
+  const saved = {};
+  document.querySelectorAll('.add-inp').forEach(el => { saved[el.dataset.cat] = el.value; });
+  const focCat = document.activeElement?.classList.contains('add-inp') ? document.activeElement.dataset.cat : null;
+
+  const wrap = document.getElementById('cats-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = catsHTML(tripId);
+
+  // Restore input values
+  Object.entries(saved).forEach(([cat, val]) => {
+    const el = document.querySelector(`.add-inp[data-cat="${CSS.escape(cat)}"]`);
+    if (el) { el.value = val; if (val) el.nextElementSibling?.classList.add('vis'); }
+  });
+  if (focCat) {
+    const el = document.querySelector(`.add-inp[data-cat="${CSS.escape(focCat)}"]`);
+    if (el) el.focus();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// VIEW HTML
+// ═══════════════════════════════════════════════════════════════════════════
+function homeHTML() {
+  const trips = Object.values(S.trips).sort((a,b)=>b.createdAt-a.createdAt);
+  const list = trips.length===0
+    ? `<div class="empty-state"><div class="empty-icon">🧳</div><p class="empty-text">Nessun viaggio ancora.<br>Tocca <strong style="color:#1D4ED8">+</strong> per iniziare!</p></div>`
+    : `<div class="home-list">${trips.map(t => {
+        const {done,total,pct} = tripProgress(t);
+        const full = pct===100;
+        return `<div class="trip-card${full?' complete':''}" data-a="open-trip" data-tid="${esc(t.id)}">
+          <div class="trip-emoji">${esc(t.emoji)}</div>
+          <div class="trip-info">
+            <div class="trip-name">${esc(t.name)}</div>
+            <div class="trip-preset">${esc(t.presetName)}</div>
+            <div class="trip-bar-track"><div class="trip-bar-fill${full?' done':''}" style="width:${pct}%"></div></div>
+            <div class="trip-stats">${done}/${total} · ${pct}% pronto${full?' 🎉':''}</div>
+          </div>
+          <button class="trip-del" data-a="del-trip" data-tid="${esc(t.id)}">🗑</button>
+        </div>`;
+      }).join('')}</div>`;
+
+  return `<div class="home-header"><p class="home-eyebrow">LumaPack ✦</p><h1 class="home-title">I tuoi viaggi</h1></div>${list}`;
+}
+
+function tripHTML(tripId) {
+  const t = S.trips[tripId];
+  if (!t) return homeHTML();
+  const {done,total,pct} = tripProgress(t);
+  return `<div class="trip-hdr">
+    <button class="back-btn" data-a="go-home">← Viaggi</button>
+    <div class="trip-hdr-row">
+      <div>
+        <div class="trip-hdr-emoji">${esc(t.emoji)}</div>
+        <div class="trip-hdr-name">${esc(t.name)}</div>
+        <div class="trip-hdr-preset">${esc(t.presetName)}</div>
+      </div>
+      ${ringHTML(pct)}
+    </div>
+  </div>
+  <div class="cats-wrap" id="cats-wrap">${catsHTML(tripId)}</div>`;
+}
+
+function presetsHTML() {
+  const list = Object.values(S.presets);
+  return `<div class="vw-hdr">
+    <button class="view-back" data-a="go-home">← Indietro</button>
+    <h1 class="view-title">Preset</h1>
+  </div>
+  <div class="presets-list">
+    ${list.map(p => {
+      const total = p.categories.reduce((s,c)=>s+c.items.length,0);
+      return `<div class="p-list-card">
+        <span class="p-list-em">${esc(p.emoji)}</span>
+        <div class="p-list-info">
+          <div class="p-list-name">${esc(p.name)}</div>
+          <div class="p-list-meta">${total} elementi · ${p.categories.length} cat.</div>
+        </div>
+        <button class="edit-btn" data-a="edit-preset" data-pid="${esc(p.id)}">✏ Modifica</button>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function editBodyInner() {
+  const {cats} = S.editState;
+  return `${cats.map((cat,ci)=>`
+    <div class="ep-cat-card" data-cat-name="${esc(cat.name)}" data-ci="${ci}">
+      <div class="ep-cat-hdr">
+        <span class="ep-cat-lbl">${esc(cat.name)}</span>
+        <button class="ep-del-cat" data-a="rm-edit-cat" data-ci="${ci}">Elimina cat.</button>
+      </div>
+      ${cat.items.map((item,ii)=>`
+        <div class="ep-item-row">
+          <input class="ep-item-inp" type="text" value="${esc(item)}" data-ci="${ci}" data-ii="${ii}">
+          <button class="ep-del-item" data-a="rm-edit-item" data-ci="${ci}" data-ii="${ii}">×</button>
+        </div>`).join('')}
+      <button class="ep-add-item" data-a="add-edit-item" data-ci="${ci}">+ Aggiungi elemento</button>
+    </div>`).join('')}
+  <div class="new-cat-row">
+    <input class="new-cat-inp" id="new-cat-inp" type="text" placeholder="+ Nuova categoria...">
+    <button class="new-cat-btn" data-a="add-edit-cat">+</button>
+  </div>
+  <button class="save-btn" data-a="save-preset">💾 Salva modifiche</button>`;
+}
+
+function renderEditBody() {
+  const el = document.getElementById('ep-body');
+  if (el) el.innerHTML = editBodyInner();
+}
+
+function editPresetHTML(presetId) {
+  const p = S.presets[presetId];
+  if (!p) return presetsHTML();
+  if (!S.editState) S.editState = { cats: JSON.parse(JSON.stringify(p.categories)) };
+  return `<div class="vw-hdr">
+    <button class="view-back" data-a="go-presets">← Preset</button>
+    <h1 class="view-title" style="display:flex;align-items:center;gap:10px">
+      <span>${esc(p.emoji)}</span><span>${esc(p.name)}</span>
+    </h1>
+  </div>
+  <div class="ep-body" id="ep-body">${editBodyInner()}</div>`;
+}
+
+function modalHTML() {
+  if (!S.showModal) return '';
+  const presets = Object.values(S.presets);
+  return `<div class="modal-bg" data-a="close-modal">
+    <div class="modal-sheet" data-a="noop">
+      <div class="modal-handle"></div>
+      <div class="modal-hdr">
+        <span class="modal-title">Nuovo Viaggio</span>
+        <button class="modal-close" data-a="close-modal">×</button>
+      </div>
+      <label class="field-lbl">Nome del viaggio</label>
+      <input class="field-inp" id="trip-name-inp" type="text" placeholder="Es. Weekend a Venezia 🌊" autocomplete="off">
+      <label class="field-lbl">Scegli preset</label>
+      <div class="preset-grid">
+        ${presets.map(p=>`
+          <button class="preset-card${S.selPresetId===p.id?' sel':''}" data-a="sel-preset" data-pid="${esc(p.id)}">
+            <div class="p-card-em">${esc(p.emoji)}</div>
+            <div class="p-card-nm">${esc(p.name)}</div>
+          </button>`).join('')}
+      </div>
+      <button class="confirm-btn" id="confirm-btn" data-a="confirm-trip">Crea Viaggio</button>
+    </div>
+  </div>`;
+}
+
+function bottomNavHTML() {
+  const homeAct = S.view==='home'||S.view==='trip';
+  const presAct = S.view==='presets'||S.view==='editPreset';
+  return `<div class="bottom-nav">
+    <button class="nav-btn${homeAct?' active':''}" data-a="go-home">
+      <span class="nav-icon">🏠</span><span class="nav-label">VIAGGI</span>
+    </button>
+    <button class="nav-plus" data-a="open-modal">+</button>
+    <button class="nav-btn${presAct?' active':''}" data-a="go-presets">
+      <span class="nav-icon">📋</span><span class="nav-label">PRESET</span>
+    </button>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════════════════
+function render() {
+  let content = '';
+  if      (S.view==='home')        content = homeHTML();
+  else if (S.view==='trip')        content = tripHTML(S.tripId);
+  else if (S.view==='presets')     content = presetsHTML();
+  else if (S.view==='editPreset')  content = editPresetHTML(S.editPresetId);
+
+  document.getElementById('app').innerHTML =
+    `<div class="scroll-area">${content}</div>${bottomNavHTML()}${modalHTML()}`;
+
+  // Post-render: focus modal input
+  if (S.showModal) {
+    const inp = document.getElementById('trip-name-inp');
+    if (inp) inp.focus();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EVENT DELEGATION
+// ═══════════════════════════════════════════════════════════════════════════
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-a]');
+  if (!el) return;
+  const a = el.dataset.a;
+
+  if (a==='noop') return;
+
+  if (a==='go-home')    { S.view='home'; S.tripId=null; S.editState=null; render(); return; }
+  if (a==='go-presets') { S.view='presets'; S.editState=null; render(); return; }
+
+  if (a==='open-modal')  { S.showModal=true; S.selPresetId=Object.keys(S.presets)[0]||''; render(); return; }
+  if (a==='close-modal') { S.showModal=false; render(); return; }
+
+  if (a==='open-trip')  { S.tripId=el.dataset.tid; S.view='trip'; render(); return; }
+  if (a==='del-trip')   { e.stopPropagation(); deleteTrip(el.dataset.tid); return; }
+
+  if (a==='toggle-item') {
+    const row = el.closest('[data-iid]') || el;
+    toggleItem(row.dataset.tid||S.tripId, row.dataset.iid);
+    return;
+  }
+  if (a==='del-item') {
+    e.stopPropagation();
+    deleteItem(el.dataset.tid, el.dataset.iid);
+    return;
+  }
+
+  if (a==='toggle-cat') {
+    const cat = el.dataset.cat;
+    S.collapsed[cat] = !S.collapsed[cat];
+    refreshCats(S.tripId);
+    return;
+  }
+
+  if (a==='add-item') {
+    const inp = document.querySelector(`.add-inp[data-cat="${CSS.escape(el.dataset.cat)}"]`);
+    const val = inp?.value.trim();
+    if (val) { addItem(el.dataset.tid, el.dataset.cat, val); inp.value=''; el.classList.remove('vis'); }
+    return;
+  }
+
+  if (a==='sel-preset') {
+    S.selPresetId = el.dataset.pid;
+    document.querySelectorAll('.preset-card').forEach(c => c.classList.toggle('sel', c.dataset.pid===S.selPresetId));
+    return;
+  }
+
+  if (a==='confirm-trip') {
+    const inp = document.getElementById('trip-name-inp');
+    const name = inp?.value.trim();
+    if (name && S.selPresetId) createTrip(name, S.selPresetId);
+    return;
+  }
+
+  if (a==='edit-preset')    { enterEditPreset(el.dataset.pid); return; }
+  if (a==='add-edit-item')  { addEditItem(+el.dataset.ci); return; }
+  if (a==='rm-edit-item')   { removeEditItem(+el.dataset.ci, +el.dataset.ii); return; }
+  if (a==='add-edit-cat')   { addEditCat(); return; }
+  if (a==='rm-edit-cat')    { removeEditCat(+el.dataset.ci); return; }
+  if (a==='save-preset')    { savePreset(); return; }
+});
+
+// Live feedback: add-input show/hide + button
+document.addEventListener('input', e => {
+  if (e.target.classList.contains('add-inp')) {
+    const btn = e.target.nextElementSibling;
+    if (btn) btn.classList.toggle('vis', e.target.value.trim().length>0);
+  }
+  if (e.target.id==='trip-name-inp') {
+    const btn = document.getElementById('confirm-btn');
+    if (btn) btn.classList.toggle('rdy', e.target.value.trim().length>0);
+  }
+});
+
+// Enter key shortcuts
+document.addEventListener('keydown', e => {
+  if (e.key!=='Enter') return;
+  if (e.target.id==='trip-name-inp') {
+    const btn = document.getElementById('confirm-btn');
+    if (btn?.classList.contains('rdy')) btn.click();
+    return;
+  }
+  if (e.target.id==='new-cat-inp') { addEditCat(); return; }
+  if (e.target.classList.contains('add-inp')) {
+    const val = e.target.value.trim();
+    if (val) {
+      addItem(e.target.dataset.tid, e.target.dataset.cat, val);
+      e.target.value = '';
+      e.target.nextElementSibling?.classList.remove('vis');
+    }
+    return;
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// START
+// ═══════════════════════════════════════════════════════════════════════════
+init();
+</script>
+</body>
+</html>
